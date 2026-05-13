@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwadQp2FCPaKFlL7QI2U4CFbZJqNleM7bCjfV75LDsYLV2UXHhV7gNjpVJLrudOOsifIg/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxILFGmT-3xuSqKQmQOxiSlYycfyV3noeiasfT-gabj_-mrDAPcY2UK2UMScuRaifF9QQ/exec";
 
 function fileToBase64(file) {
   return new Promise(function(resolve) {
