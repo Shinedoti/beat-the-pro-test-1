@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { uploadFile } from "./uploadFile";
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzRIDLVH-ug5i4o2SRiqMZOicrkN-EsEAA69dAR66lxsIqDK8IVLDpMD_efGjhvTRUn9A/exec";
 
@@ -218,6 +219,7 @@ export default function App() {
   const [animKey, setAnimKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [form, setForm] = useState({
     kidNameEN: "", kidNameTH: "", kidAge: "", kidGender: "",
     kidGolfExp: "", kidAcadYear: "", kidSchool: "", kidProvince: "",
@@ -286,32 +288,72 @@ export default function App() {
     setErrors({}); goTo(to);
   }
 
-  function submitToSheet() {
+  async function submitToSheet() {
     const e = validate(3);
     if (Object.keys(e).length > 0) { setErrors(e); return; }
     setErrors({});
     setSubmitting(true);
     setSubmitError("");
-    const f = formRef.current, d = daysRef.current;
-    const url = SCRIPT_URL
-      + "?activity="    + encodeURIComponent(d.join(" & "))
-      + "&kidNameEN="   + encodeURIComponent(f.kidNameEN)
-      + "&kidNameTH="   + encodeURIComponent(f.kidNameTH)
-      + "&kidAge="      + encodeURIComponent(f.kidAge)
-      + "&kidGender="   + encodeURIComponent(f.kidGender)
-      + "&kidGolfExp="  + encodeURIComponent(f.kidGolfExp)
-      + "&kidAcadYear=" + encodeURIComponent(f.kidAcadYear)
-      + "&kidSchool="   + encodeURIComponent(f.kidSchool)
-      + "&kidProvince=" + encodeURIComponent(f.kidProvince)
-      + "&kidCert="     + encodeURIComponent(f.kidCert)
-      + "&parentName="  + encodeURIComponent(f.parentName)
-      + "&parentPhone=" + encodeURIComponent(f.parentPhone)
-      + "&parentEmail=" + encodeURIComponent(f.parentEmail);
-    const iframe = document.createElement("iframe");
-    iframe.style.display = "none";
-    iframe.src = url;
-    document.body.appendChild(iframe);
-    setTimeout(() => { document.body.removeChild(iframe); setSubmitting(false); goTo(4); }, 4000);
+    setUploadProgress(0);
+
+    const f = formRef.current;
+    const d = daysRef.current;
+    const prefix = f.kidNameEN || "kid";
+
+    try {
+      setUploadProgress(10);
+
+      // Upload all files to Supabase in parallel
+      const [photoUrl, scorecardUrl, swingUrl, introUrl] = await Promise.all([
+        f.kidPhoto   ? uploadFile(f.kidPhoto,   "Photos",       prefix) : Promise.resolve(""),
+        f.scorecard  ? uploadFile(f.scorecard,  "Scorecard",    prefix) : Promise.resolve(""),
+        f.swingVideo ? uploadFile(f.swingVideo, "swing_video",  prefix) : Promise.resolve(""),
+        f.introVideo ? uploadFile(f.introVideo, "intro_video",  prefix) : Promise.resolve(""),
+      ]);
+
+      setUploadProgress(80);
+
+      // Submit text data + file URLs to Google Sheets
+      const url = SCRIPT_URL
+        + "?activity="     + encodeURIComponent(d.join(" & "))
+        + "&kidNameEN="    + encodeURIComponent(f.kidNameEN)
+        + "&kidNameTH="    + encodeURIComponent(f.kidNameTH)
+        + "&kidAge="       + encodeURIComponent(f.kidAge)
+        + "&kidGender="    + encodeURIComponent(f.kidGender)
+        + "&kidGolfExp="   + encodeURIComponent(f.kidGolfExp)
+        + "&kidAcadYear="  + encodeURIComponent(f.kidAcadYear)
+        + "&kidSchool="    + encodeURIComponent(f.kidSchool)
+        + "&kidProvince="  + encodeURIComponent(f.kidProvince)
+        + "&kidCert="      + encodeURIComponent(f.kidCert)
+        + "&parentName="   + encodeURIComponent(f.parentName)
+        + "&parentPhone="  + encodeURIComponent(f.parentPhone)
+        + "&parentEmail="  + encodeURIComponent(f.parentEmail)
+        + "&photoUrl="     + encodeURIComponent(photoUrl)
+        + "&scorecardUrl=" + encodeURIComponent(scorecardUrl)
+        + "&swingUrl="     + encodeURIComponent(swingUrl)
+        + "&introUrl="     + encodeURIComponent(introUrl);
+
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = url;
+      document.body.appendChild(iframe);
+
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+        setUploadProgress(100);
+        setTimeout(() => {
+          setSubmitting(false);
+          setUploadProgress(0);
+          goTo(4);
+        }, 400);
+      }, 3000);
+
+    } catch (err) {
+      console.error(err);
+      setSubmitError(t.networkError);
+      setSubmitting(false);
+      setUploadProgress(0);
+    }
   }
 
   function resetForm() {
@@ -511,8 +553,19 @@ export default function App() {
                   : <div style={{ textAlign: "center", padding: "20px 0", color: c.textSub, fontSize: 13 }}>{t.noFiles}</div>
                 }
               </div>
+              {submitting && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: c.textSub, marginBottom: 4 }}>
+                    <span>⬆ Uploading files...</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div style={{ height: 6, borderRadius: 6, background: c.border }}>
+                    <div style={{ height: 6, borderRadius: 6, background: c.primary, width: uploadProgress + "%", transition: "width 0.4s ease" }} />
+                  </div>
+                </div>
+              )}
               <div style={{ display: "flex", gap: 10 }}>
-                <button style={btnO} onClick={() => goTo(2)}>← {t.back}</button>
+                <button style={btnO} onClick={() => goTo(2)} disabled={submitting}>← {t.back}</button>
                 <button style={{ ...btnP, flex: 2, opacity: submitting ? 0.7 : 1 }} onClick={submitToSheet} disabled={submitting}>
                   {submitting ? "⏳ " + t.submitting : t.submit + " ✓"}
                 </button>
