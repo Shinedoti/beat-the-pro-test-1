@@ -1,5 +1,16 @@
 import { useState, useRef } from "react";
 
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwadQp2FCPaKFlL7QI2U4CFbZJqNleM7bCjfV75LDsYLV2UXHhV7gNjpVJLrudOOsifIg/exec";
+
+function fileToBase64(file) {
+  return new Promise(function(resolve) {
+    if (!file) { resolve(null); return; }
+    var reader = new FileReader();
+    reader.onload = function(e) { resolve(e.target.result); };
+    reader.readAsDataURL(file);
+  });
+}
+
 const THEMES = [
   { name: "White",  nameT: "ขาว",    primary: "#F5B800", bg: "#F5F5F0", card: "#FFFFFF", headerText: "#1A1A1A", textMain: "#1A1A1A", textSub: "#555", border: "#CCC" },
   { name: "Yellow", nameT: "เหลือง", primary: "#F5B800", bg: "#1E1E1E", card: "#2A2A2A", headerText: "#1A1A1A", textMain: "#EEE",    textSub: "#AAA", border: "#444" },
@@ -46,6 +57,7 @@ const lang = {
     colors: "Theme", registerAnother: "+ Register Another",
     activityLabel: "Activity", parentLabel: "Parent", phoneLabel: "Phone",
     noFiles: "No files required for this activity 🏌️",
+    submitting: "Submitting...", networkError: "Network error. Please try again.",
   },
   th: {
     brand: "all Thailand", brandSub: "Golf Clinic",
@@ -75,6 +87,7 @@ const lang = {
     colors: "ธีม", registerAnother: "+ ลงทะเบียนอีกคน",
     activityLabel: "กิจกรรม", parentLabel: "ผู้ปกครอง", phoneLabel: "โทรศัพท์",
     noFiles: "ไม่จำเป็นต้องอัปโหลดไฟล์สำหรับกิจกรรมนี้ 🏌️",
+    submitting: "กำลังส่งข้อมูล...", networkError: "เกิดข้อผิดพลาด กรุณาลองใหม่",
   },
 };
 
@@ -134,7 +147,7 @@ function Input({ label, placeholder, type, value, onChange, error, c }) {
         {label} <span style={{ color: "#E55" }}>*</span>
       </label>
       <input type={type || "text"} placeholder={placeholder} value={value}
-        onChange={function(e){ onChange(e.target.value); }}
+        onChange={function(e) { onChange(e.target.value); }}
         style={{
           width: "100%", padding: "12px 14px", borderRadius: 12,
           border: "2px solid " + (error ? "#E55" : value ? c.primary : c.border),
@@ -158,10 +171,10 @@ function ChoiceSelect({ label, value, onChange, error, c, options }) {
         {label} <span style={{ color: "#E55" }}>*</span>
       </label>
       <div style={{ display: "flex", gap: 8 }}>
-        {options.map(function(opt){
+        {options.map(function(opt) {
           var sel = value === opt.value;
           return (
-            <div key={opt.value} onClick={function(){ onChange(opt.value); }} style={{
+            <div key={opt.value} onClick={function() { onChange(opt.value); }} style={{
               flex: 1, padding: "10px 6px", borderRadius: 12, cursor: "pointer", textAlign: "center",
               border: "2px solid " + (sel ? c.primary : error ? "#E55" : c.border),
               background: sel ? c.primary + "18" : "rgba(128,128,128,0.08)",
@@ -179,14 +192,14 @@ function ChoiceSelect({ label, value, onChange, error, c, options }) {
 }
 
 function FileUpload({ label, value, onChange, error, c, videoOnly }) {
-  const ref = useRef();
+  var ref = useRef();
   return (
     <div style={{ marginBottom: 14 }}>
       <label style={{ fontSize: 12, color: c.textSub, display: "block", marginBottom: 6, letterSpacing: 0.3 }}>
         {label} <span style={{ color: "#E55" }}>*</span>
         {videoOnly && <span style={{ color: c.primary, marginLeft: 6, fontSize: 10 }}>(video only)</span>}
       </label>
-      <div onClick={function(){ ref.current.click(); }} style={{
+      <div onClick={function() { ref.current.click(); }} style={{
         border: "2px dashed " + (error ? "#E55" : value ? c.primary : c.border),
         borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center",
         gap: 12, cursor: "pointer", background: value ? c.primary + "18" : "rgba(128,128,128,0.08)", transition: "all 0.25s",
@@ -195,7 +208,7 @@ function FileUpload({ label, value, onChange, error, c, videoOnly }) {
         <span style={{ fontSize: 13, color: value ? c.primary : error ? "#E55" : c.textSub, fontWeight: value ? 600 : 400 }}>
           {value ? value.name : label}
         </span>
-        <input ref={ref} type="file" accept={videoOnly ? "video/*" : "*/*"} style={{ display: "none" }} onChange={function(e){ onChange(e.target.files[0]); }} />
+        <input ref={ref} type="file" accept={videoOnly ? "video/*" : "*/*"} style={{ display: "none" }} onChange={function(e) { onChange(e.target.files[0]); }} />
       </div>
       {error && <div className="fade-in" style={{ fontSize: 12, color: "#E55", marginTop: 5 }}>⚠ {error}</div>}
     </div>
@@ -212,6 +225,8 @@ export default function App() {
   var [showTheme, setShowTheme]           = useState(false);
   var [errors, setErrors]                 = useState({});
   var [animKey, setAnimKey]               = useState(0);
+  var [submitting, setSubmitting]         = useState(false);
+  var [submitError, setSubmitError]       = useState("");
   var [form, setForm]                     = useState({
     kidNameEN: "", kidNameTH: "", kidAge: "", kidGender: "",
     kidGolfExp: "", kidAcadYear: "", kidSchool: "", kidProvince: "",
@@ -224,13 +239,13 @@ export default function App() {
   var t = lang[language];
 
   function setF(k, v) {
-    setForm(function(f){ return Object.assign({}, f, { [k]: v }); });
-    setErrors(function(e){ return Object.assign({}, e, { [k]: null }); });
+    setForm(function(f) { return Object.assign({}, f, { [k]: v }); });
+    setErrors(function(e) { return Object.assign({}, e, { [k]: null }); });
   }
 
   function toggleDay(d) {
-    setDays(function(prev){ return prev.includes(d) ? prev.filter(function(x){ return x !== d; }) : prev.concat([d]); });
-    setErrors(function(e){ return Object.assign({}, e, { days: null }); });
+    setDays(function(prev) { return prev.includes(d) ? prev.filter(function(x) { return x !== d; }) : prev.concat([d]); });
+    setErrors(function(e) { return Object.assign({}, e, { days: null }); });
   }
 
   function validate(s) {
@@ -262,13 +277,56 @@ export default function App() {
     return e;
   }
 
-  function goTo(to) { setAnimKey(function(k){ return k + 1; }); setStep(to); }
-  function handleGetStarted() { setSplashOut(true); setTimeout(function(){ setSplashOut(false); setShowLangPicker(true); }, 400); }
+  function goTo(to) { setAnimKey(function(k) { return k + 1; }); setStep(to); }
+  function handleGetStarted() { setSplashOut(true); setTimeout(function() { setSplashOut(false); setShowLangPicker(true); }, 400); }
   function selectLanguage(l) { setLanguage(l); setShowLangPicker(false); goTo(0); }
+
   function tryNext(from, to) {
     var e = validate(from);
     if (Object.keys(e).length > 0) { setErrors(e); return; }
     setErrors({}); goTo(to);
+  }
+
+  function submitToSheet() {
+    var e = validate(3);
+    if (Object.keys(e).length > 0) { setErrors(e); return; }
+    setErrors({});
+    setSubmitting(true);
+    setSubmitError("");
+
+    Promise.all([
+      fileToBase64(form.kidPhoto),
+      fileToBase64(form.scorecard),
+      fileToBase64(form.swingVideo),
+      fileToBase64(form.introVideo),
+    ]).then(function(results) {
+      var payload = {
+        activity: days.join(" & "),
+        kidNameEN: form.kidNameEN, kidNameTH: form.kidNameTH,
+        kidAge: form.kidAge, kidGender: form.kidGender,
+        kidGolfExp: form.kidGolfExp, kidAcadYear: form.kidAcadYear,
+        kidSchool: form.kidSchool, kidProvince: form.kidProvince,
+        kidCert: form.kidCert,
+        parentName: form.parentName, parentPhone: form.parentPhone, parentEmail: form.parentEmail,
+        kidPhoto: results[0], scorecard: results[1], swingVideo: results[2], introVideo: results[3],
+      };
+      return fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify(payload) });
+    }).then(function(res) {
+      return res.json();
+    }).then(function(json) {
+      setSubmitting(false);
+      if (json.success) { goTo(4); }
+      else { setSubmitError("Submission failed: " + json.error); }
+    }).catch(function() {
+      setSubmitting(false);
+      setSubmitError(t.networkError);
+    });
+  }
+
+  function resetForm() {
+    goTo(0); setDays([]);
+    setForm({ kidNameEN: "", kidNameTH: "", kidAge: "", kidGender: "", kidGolfExp: "", kidAcadYear: "", kidSchool: "", kidProvince: "", kidCert: "", kidPhoto: null, parentName: "", parentPhone: "", parentEmail: "", scorecard: null, swingVideo: null, introVideo: null });
+    setErrors({});
   }
 
   var steps = [t.step1, t.step2, t.step3];
@@ -338,10 +396,10 @@ export default function App() {
                     <rect y="13.33" width="60" height="13.33" fill="#2D2A4A"/>
                   </svg>
                 )},
-              ].map(function(opt){
+              ].map(function(opt) {
                 var sel = language === opt.code;
                 return (
-                  <div key={opt.code} className="hover-flag" onClick={function(){ selectLanguage(opt.code); }} style={{
+                  <div key={opt.code} className="hover-flag" onClick={function() { selectLanguage(opt.code); }} style={{
                     cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
                     padding: "14px 18px", borderRadius: 16,
                     border: "2px solid " + (sel ? c.primary : "transparent"),
@@ -362,7 +420,7 @@ export default function App() {
       {step >= 0 && (
         <div className="fade-in" style={{ background: c.card, borderBottom: "3px solid " + c.primary, padding: "16px 20px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div onClick={function(){ goTo(-1); }} style={{ cursor: "pointer" }}>
+            <div onClick={function() { goTo(-1); }} style={{ cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
                 <span style={{ fontSize: 11, color: "#AAA", letterSpacing: 1 }}>{t.brand}</span>
                 <span style={{ fontSize: 11, color: c.primary, letterSpacing: 2, fontWeight: 700 }}>{t.brandSub}</span>
@@ -372,9 +430,9 @@ export default function App() {
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
               <div style={{ display: "flex", background: "rgba(128,128,128,0.15)", borderRadius: 20, overflow: "hidden", border: "1px solid " + c.border }}>
-                {["en","th"].map(function(l){
+                {["en", "th"].map(function(l) {
                   return (
-                    <button key={l} onClick={function(){ setLanguage(l); }} style={{
+                    <button key={l} onClick={function() { setLanguage(l); }} style={{
                       padding: "5px 14px", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700,
                       background: language === l ? c.primary : "transparent",
                       color: language === l ? c.headerText : c.textSub,
@@ -383,16 +441,16 @@ export default function App() {
                   );
                 })}
               </div>
-              <button onClick={function(){ setShowTheme(!showTheme); }} style={{ background: "transparent", border: "1px solid " + c.border, borderRadius: 20, padding: "4px 10px", color: c.textSub, fontSize: 11, cursor: "pointer" }}>
+              <button onClick={function() { setShowTheme(!showTheme); }} style={{ background: "transparent", border: "1px solid " + c.border, borderRadius: 20, padding: "4px 10px", color: c.textSub, fontSize: 11, cursor: "pointer" }}>
                 🎨 {t.colors}
               </button>
             </div>
           </div>
           {showTheme && (
             <div className="fade-up" style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              {THEMES.map(function(th, i){
+              {THEMES.map(function(th, i) {
                 return (
-                  <button key={i} onClick={function(){ setThemeIdx(i); setShowTheme(false); }} style={{
+                  <button key={i} onClick={function() { setThemeIdx(i); setShowTheme(false); }} style={{
                     background: th.primary, border: i === themeIdx ? "2px solid " + (i === 0 ? "#333" : "#FFF") : "2px solid transparent",
                     borderRadius: 20, padding: "5px 14px", color: th.headerText, fontSize: 12, cursor: "pointer", fontWeight: 700,
                   }}>{language === "th" ? th.nameT : th.name}</button>
@@ -402,7 +460,7 @@ export default function App() {
           )}
           {step > 0 && step < 4 && (
             <div style={{ display: "flex", alignItems: "center", marginTop: 16 }}>
-              {steps.map(function(s, i){
+              {steps.map(function(s, i) {
                 return (
                   <div key={i} style={{ display: "flex", alignItems: "center", flex: i < 2 ? 1 : "none" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -429,16 +487,16 @@ export default function App() {
       {step >= 0 && (
         <div style={{ padding: "20px 16px", maxWidth: 480, margin: "0 auto" }}>
 
-          {/* Step 0 — Day Select */}
+          {/* Step 0 */}
           {step === 0 && (
             <div key={animKey} className="slide-in">
               <div style={{ fontSize: 13, color: c.textSub, letterSpacing: 2, textTransform: "uppercase", marginBottom: 2 }}>• {t.selectDay} •</div>
               <div style={{ fontSize: 11, color: c.textSub, marginBottom: 16 }}>{t.selectHint}</div>
-              {[{ label: t.saturday, details: SAT_DETAILS }, { label: t.sunday, details: SUN_DETAILS }].map(function(item, idx){
+              {[{ label: t.saturday, details: SAT_DETAILS }, { label: t.sunday, details: SUN_DETAILS }].map(function(item, idx) {
                 var sel = days.includes(item.label);
                 return (
                   <Anim key={item.label} cls="fade-up" delay={idx * 0.1}>
-                    <div className="hover-card" onClick={function(){ toggleDay(item.label); }} style={{
+                    <div className="hover-card" onClick={function() { toggleDay(item.label); }} style={{
                       background: sel ? c.primary + "14" : c.card, borderRadius: 18, marginBottom: 14,
                       cursor: "pointer", border: "2px solid " + (sel ? c.primary : c.border),
                       overflow: "hidden", transition: "all 0.25s",
@@ -453,7 +511,7 @@ export default function App() {
                       </div>
                       {sel && (
                         <div className="expand-in" style={{ borderTop: "1px solid " + c.primary + "44", padding: "14px 18px 16px" }}>
-                          {item.details.map(function(d, i){ return <DetailLine key={i} item={d} color={c.textMain} />; })}
+                          {item.details.map(function(d, i) { return <DetailLine key={i} item={d} color={c.textMain} />; })}
                         </div>
                       )}
                     </div>
@@ -461,82 +519,81 @@ export default function App() {
                 );
               })}
               {errors.days && <div className="fade-in" style={{ fontSize: 12, color: "#E55", marginBottom: 10 }}>⚠ {errors.days}</div>}
-              <button style={Object.assign({}, btnP, { width: "100%" })} onClick={function(){ tryNext(0, 1); }}>{t.next} →</button>
+              <button style={Object.assign({}, btnP, { width: "100%" })} onClick={function() { tryNext(0, 1); }}>{t.next} →</button>
             </div>
           )}
 
-          {/* Step 1 — Kid Profile */}
+          {/* Step 1 */}
           {step === 1 && (
             <div key={animKey} className="slide-in">
               <div style={cardStyle}>
                 <div style={{ fontSize: 13, color: c.primary, letterSpacing: 2, fontWeight: 700, marginBottom: 12 }}>⛳ {t.step1.toUpperCase()}</div>
-
                 <SectionDivider label="Name" c={c} />
-                <Input label={t.kidNameEN} placeholder={t.kidNameENPh} value={form.kidNameEN} onChange={function(v){ setF("kidNameEN", v); }} error={errors.kidNameEN} c={c} />
-                <Input label={t.kidNameTH} placeholder={t.kidNameTHPh} value={form.kidNameTH} onChange={function(v){ setF("kidNameTH", v); }} error={errors.kidNameTH} c={c} />
-
+                <Input label={t.kidNameEN} placeholder={t.kidNameENPh} value={form.kidNameEN} onChange={function(v) { setF("kidNameEN", v); }} error={errors.kidNameEN} c={c} />
+                <Input label={t.kidNameTH} placeholder={t.kidNameTHPh} value={form.kidNameTH} onChange={function(v) { setF("kidNameTH", v); }} error={errors.kidNameTH} c={c} />
                 <SectionDivider label="Personal Info" c={c} />
                 <TwoCol>
-                  <Input label={t.kidAge} placeholder={t.kidAgePh} type="number" value={form.kidAge} onChange={function(v){ setF("kidAge", v); }} error={errors.kidAge} c={c} />
-                  <Input label={t.kidGolfExp} placeholder={t.kidGolfExpPh} type="number" value={form.kidGolfExp} onChange={function(v){ setF("kidGolfExp", v); }} error={errors.kidGolfExp} c={c} />
+                  <Input label={t.kidAge} placeholder={t.kidAgePh} type="number" value={form.kidAge} onChange={function(v) { setF("kidAge", v); }} error={errors.kidAge} c={c} />
+                  <Input label={t.kidGolfExp} placeholder={t.kidGolfExpPh} type="number" value={form.kidGolfExp} onChange={function(v) { setF("kidGolfExp", v); }} error={errors.kidGolfExp} c={c} />
                 </TwoCol>
-                <ChoiceSelect label={t.gender} value={form.kidGender} onChange={function(v){ setF("kidGender", v); }} error={errors.kidGender} c={c} options={genderOpts} />
-
+                <ChoiceSelect label={t.gender} value={form.kidGender} onChange={function(v) { setF("kidGender", v); }} error={errors.kidGender} c={c} options={genderOpts} />
                 <SectionDivider label="Academic Info" c={c} />
                 <TwoCol>
-                  <Input label={t.kidAcadYear} placeholder={t.kidAcadYearPh} value={form.kidAcadYear} onChange={function(v){ setF("kidAcadYear", v); }} error={errors.kidAcadYear} c={c} />
-                  <Input label={t.kidProvince} placeholder={t.kidProvincePh} value={form.kidProvince} onChange={function(v){ setF("kidProvince", v); }} error={errors.kidProvince} c={c} />
+                  <Input label={t.kidAcadYear} placeholder={t.kidAcadYearPh} value={form.kidAcadYear} onChange={function(v) { setF("kidAcadYear", v); }} error={errors.kidAcadYear} c={c} />
+                  <Input label={t.kidProvince} placeholder={t.kidProvincePh} value={form.kidProvince} onChange={function(v) { setF("kidProvince", v); }} error={errors.kidProvince} c={c} />
                 </TwoCol>
-                <Input label={t.kidSchool} placeholder={t.kidSchoolPh} value={form.kidSchool} onChange={function(v){ setF("kidSchool", v); }} error={errors.kidSchool} c={c} />
-
+                <Input label={t.kidSchool} placeholder={t.kidSchoolPh} value={form.kidSchool} onChange={function(v) { setF("kidSchool", v); }} error={errors.kidSchool} c={c} />
                 <SectionDivider label="Certificate" c={c} />
-                <ChoiceSelect label={t.kidCert} value={form.kidCert} onChange={function(v){ setF("kidCert", v); }} error={errors.kidCert} c={c} options={certOpts} />
-
+                <ChoiceSelect label={t.kidCert} value={form.kidCert} onChange={function(v) { setF("kidCert", v); }} error={errors.kidCert} c={c} options={certOpts} />
                 <SectionDivider label="Photo" c={c} />
-                <FileUpload label={t.kidPhoto} value={form.kidPhoto} onChange={function(v){ setF("kidPhoto", v); }} error={errors.kidPhoto} c={c} />
+                <FileUpload label={t.kidPhoto} value={form.kidPhoto} onChange={function(v) { setF("kidPhoto", v); }} error={errors.kidPhoto} c={c} />
               </div>
               <div style={{ display: "flex", gap: 10 }}>
-                <button style={btnO} onClick={function(){ goTo(0); }}>← {t.back}</button>
-                <button style={btnP} onClick={function(){ tryNext(1, 2); }}>{t.next} →</button>
+                <button style={btnO} onClick={function() { goTo(0); }}>← {t.back}</button>
+                <button style={btnP} onClick={function() { tryNext(1, 2); }}>{t.next} →</button>
               </div>
             </div>
           )}
 
-          {/* Step 2 — Parent */}
+          {/* Step 2 */}
           {step === 2 && (
             <div key={animKey} className="slide-in">
               <div style={cardStyle}>
                 <div style={{ fontSize: 13, color: c.primary, letterSpacing: 2, fontWeight: 700, marginBottom: 16 }}>👨‍👧 {t.step2.toUpperCase()}</div>
-                <Input label={t.parentName} placeholder={t.parentNamePh} value={form.parentName} onChange={function(v){ setF("parentName", v); }} error={errors.parentName} c={c} />
-                <Input label={t.parentPhone} placeholder={t.parentPhonePh} type="tel" value={form.parentPhone} onChange={function(v){ setF("parentPhone", v); }} error={errors.parentPhone} c={c} />
-                <Input label={t.parentEmail} placeholder={t.parentEmailPh} type="email" value={form.parentEmail} onChange={function(v){ setF("parentEmail", v); }} error={errors.parentEmail} c={c} />
+                <Input label={t.parentName} placeholder={t.parentNamePh} value={form.parentName} onChange={function(v) { setF("parentName", v); }} error={errors.parentName} c={c} />
+                <Input label={t.parentPhone} placeholder={t.parentPhonePh} type="tel" value={form.parentPhone} onChange={function(v) { setF("parentPhone", v); }} error={errors.parentPhone} c={c} />
+                <Input label={t.parentEmail} placeholder={t.parentEmailPh} type="email" value={form.parentEmail} onChange={function(v) { setF("parentEmail", v); }} error={errors.parentEmail} c={c} />
               </div>
               <div style={{ display: "flex", gap: 10 }}>
-                <button style={btnO} onClick={function(){ goTo(1); }}>← {t.back}</button>
-                <button style={btnP} onClick={function(){ tryNext(2, 3); }}>{t.next} →</button>
+                <button style={btnO} onClick={function() { goTo(1); }}>← {t.back}</button>
+                <button style={btnP} onClick={function() { tryNext(2, 3); }}>{t.next} →</button>
               </div>
             </div>
           )}
 
-          {/* Step 3 — Files */}
+          {/* Step 3 */}
           {step === 3 && (
             <div key={animKey} className="slide-in">
               <div style={cardStyle}>
                 <div style={{ fontSize: 13, color: c.primary, letterSpacing: 2, fontWeight: 700, marginBottom: 16 }}>🏆 {t.step3.toUpperCase()}</div>
                 {days.includes(t.saturday) ? (
                   <div>
-                    <FileUpload label={t.scorecard}  value={form.scorecard}  onChange={function(v){ setF("scorecard", v); }}  error={errors.scorecard}  c={c} />
-                    <FileUpload label={t.swingVideo} value={form.swingVideo} onChange={function(v){ setF("swingVideo", v); }} error={errors.swingVideo} c={c} videoOnly={true} />
-                    <FileUpload label={t.introVideo} value={form.introVideo} onChange={function(v){ setF("introVideo", v); }} error={errors.introVideo} c={c} videoOnly={true} />
+                    <FileUpload label={t.scorecard}  value={form.scorecard}  onChange={function(v) { setF("scorecard", v); }}  error={errors.scorecard}  c={c} />
+                    <FileUpload label={t.swingVideo} value={form.swingVideo} onChange={function(v) { setF("swingVideo", v); }} error={errors.swingVideo} c={c} videoOnly={true} />
+                    <FileUpload label={t.introVideo} value={form.introVideo} onChange={function(v) { setF("introVideo", v); }} error={errors.introVideo} c={c} videoOnly={true} />
                   </div>
                 ) : (
                   <div style={{ textAlign: "center", padding: "20px 0", color: c.textSub, fontSize: 13 }}>{t.noFiles}</div>
                 )}
               </div>
               <div style={{ display: "flex", gap: 10 }}>
-                <button style={btnO} onClick={function(){ goTo(2); }}>← {t.back}</button>
-                <button style={Object.assign({}, btnP, { flex: 2 })} onClick={function(){ tryNext(3, 4); }}>{t.submit} ✓</button>
+                <button style={btnO} onClick={function() { goTo(2); }}>← {t.back}</button>
+                <button style={Object.assign({}, btnP, { flex: 2, opacity: submitting ? 0.7 : 1 })}
+                  onClick={submitToSheet} disabled={submitting}>
+                  {submitting ? "⏳ " + t.submitting : t.submit + " ✓"}
+                </button>
               </div>
+              {submitError && <div className="fade-in" style={{ fontSize: 12, color: "#E55", marginTop: 10, textAlign: "center" }}>⚠ {submitError}</div>}
             </div>
           )}
 
@@ -560,7 +617,7 @@ export default function App() {
                     ["School", form.kidSchool],
                     [t.parentLabel, form.parentName],
                     [t.phoneLabel, form.parentPhone],
-                  ].map(function(row){
+                  ].map(function(row) {
                     return (
                       <div key={row[0]} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, borderBottom: "1px solid " + c.border, padding: "10px 0" }}>
                         <span style={{ color: c.textSub, letterSpacing: 1, textTransform: "uppercase", fontSize: 11 }}>{row[0]}</span>
@@ -571,11 +628,7 @@ export default function App() {
                 </div>
               </Anim>
               <Anim cls="fade-up" delay={0.6}>
-                <button style={Object.assign({}, btnP, { width: "100%", marginTop: 8 })} onClick={function(){
-                  goTo(0); setDays([]);
-                  setForm({ kidNameEN: "", kidNameTH: "", kidAge: "", kidGender: "", kidGolfExp: "", kidAcadYear: "", kidSchool: "", kidProvince: "", kidCert: "", kidPhoto: null, parentName: "", parentPhone: "", parentEmail: "", scorecard: null, swingVideo: null, introVideo: null });
-                  setErrors({});
-                }}>{t.registerAnother}</button>
+                <button style={Object.assign({}, btnP, { width: "100%", marginTop: 8 })} onClick={resetForm}>{t.registerAnother}</button>
               </Anim>
             </div>
           )}
