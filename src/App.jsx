@@ -105,7 +105,9 @@ const css = `
 .hover-card:hover { transform: scale(1.02) !important; box-shadow: 0 0 20px #F5B80044 !important }
 .hover-flag  { transition: transform 0.18s ease, box-shadow 0.18s ease !important }
 .hover-flag:hover { transform: scale(1.08) !important; box-shadow: 0 0 16px #F5B80077 !important }
-input:focus  { border-color: #F5B800 !important }
+input:focus  { border-color: #F5B800 !important; outline: none; }
+* { box-sizing: border-box; }
+body { margin: 0; }
 `;
 
 function Anim({ cls = "fade-up", delay = 0, style, children }) {
@@ -136,7 +138,7 @@ function Input({ label, placeholder, type = "text", value, onChange, error, c })
       <input
         type={type} placeholder={placeholder} value={value}
         onChange={e => onChange(e.target.value)}
-        style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "2px solid " + (error ? "#E55" : value ? c.primary : c.border), fontSize: 15, background: "rgba(128,128,128,0.08)", color: c.textMain, outline: "none", boxSizing: "border-box" }}
+        style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "2px solid " + (error ? "#E55" : value ? c.primary : c.border), fontSize: 15, background: "rgba(128,128,128,0.08)", color: c.textMain, outline: "none" }}
       />
       {error && <div className="fade-in" style={{ fontSize: 12, color: "#E55", marginTop: 5 }}>⚠ {error}</div>}
     </div>
@@ -216,7 +218,13 @@ export default function App() {
   const [animKey, setAnimKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [form, setForm] = useState({ kidNameEN: "", kidNameTH: "", kidAge: "", kidGender: "", kidGolfExp: "", kidAcadYear: "", kidSchool: "", kidProvince: "", kidCert: "", kidPhoto: null, parentName: "", parentPhone: "", parentEmail: "", scorecard: null, swingVideo: null, introVideo: null });
+  const [form, setForm] = useState({
+    kidNameEN: "", kidNameTH: "", kidAge: "", kidGender: "",
+    kidGolfExp: "", kidAcadYear: "", kidSchool: "", kidProvince: "",
+    kidCert: "", kidPhoto: null,
+    parentName: "", parentPhone: "", parentEmail: "",
+    scorecard: null, swingVideo: null, introVideo: null,
+  });
 
   const formRef = useRef(form); formRef.current = form;
   const daysRef = useRef(days); daysRef.current = days;
@@ -238,16 +246,16 @@ export default function App() {
     const e = {};
     if (st === 0 && days.length === 0) e.days = t.errorDay;
     if (st === 1) {
-      if (!form.kidNameEN.trim())   e.kidNameEN  = t.errorRequired;
-      if (!form.kidNameTH.trim())   e.kidNameTH  = t.errorRequired;
-      if (!form.kidAge.trim())      e.kidAge     = t.errorRequired;
-      if (!form.kidGender)          e.kidGender  = t.errorGender;
-      if (!form.kidGolfExp.trim())  e.kidGolfExp = t.errorRequired;
-      if (!form.kidAcadYear.trim()) e.kidAcadYear= t.errorRequired;
-      if (!form.kidSchool.trim())   e.kidSchool  = t.errorRequired;
-      if (!form.kidProvince.trim()) e.kidProvince= t.errorRequired;
-      if (!form.kidCert)            e.kidCert    = t.errorCert;
-      if (!form.kidPhoto)           e.kidPhoto   = t.errorFile;
+      if (!form.kidNameEN.trim())   e.kidNameEN   = t.errorRequired;
+      if (!form.kidNameTH.trim())   e.kidNameTH   = t.errorRequired;
+      if (!form.kidAge.trim())      e.kidAge      = t.errorRequired;
+      if (!form.kidGender)          e.kidGender   = t.errorGender;
+      if (!form.kidGolfExp.trim())  e.kidGolfExp  = t.errorRequired;
+      if (!form.kidAcadYear.trim()) e.kidAcadYear = t.errorRequired;
+      if (!form.kidSchool.trim())   e.kidSchool   = t.errorRequired;
+      if (!form.kidProvince.trim()) e.kidProvince = t.errorRequired;
+      if (!form.kidCert)            e.kidCert     = t.errorCert;
+      if (!form.kidPhoto)           e.kidPhoto    = t.errorFile;
     }
     if (st === 2) {
       if (!form.parentName.trim())  e.parentName  = t.errorRequired;
@@ -546,7 +554,6 @@ export default function App() {
               </Anim>
             </div>
           )}
-
         </div>
       )}
     </div>
