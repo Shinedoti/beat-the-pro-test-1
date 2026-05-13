@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzRIDLVH-ug5i4o2SRiqMZOicrkN-EsEAA69dAR66lxsIqDK8IVLDpMD_efGjhvTRUn9A/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxecUo46G59GJehatBmB9n-Npy8OFdF84M3FFo9Q7wy_fvvRnleQH562X3tjT1C3QxRnA/exec";
 
 const THEMES = [
   { name: "White",  nameT: "ขาว",    primary: "#F5B800", bg: "#F5F5F0", card: "#FFFFFF", headerText: "#1A1A1A", textMain: "#1A1A1A", textSub: "#555", border: "#CCC" },
