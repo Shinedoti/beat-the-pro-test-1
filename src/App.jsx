@@ -310,13 +310,10 @@ export default function App() {
         parentName: form.parentName, parentPhone: form.parentPhone, parentEmail: form.parentEmail,
         kidPhoto: results[0], scorecard: results[1], swingVideo: results[2], introVideo: results[3],
       };
-      return fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify(payload) });
-    }).then(function(res) {
-      return res.json();
-    }).then(function(json) {
+      return fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+    }).then(function() {
       setSubmitting(false);
-      if (json.success) { goTo(4); }
-      else { setSubmitError("Submission failed: " + json.error); }
+      goTo(4);
     }).catch(function() {
       setSubmitting(false);
       setSubmitError(t.networkError);
