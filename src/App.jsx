@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxILFGmT-3xuSqKQmQOxiSlYycfyV3noeiasfT-gabj_-mrDAPcY2UK2UMScuRaifF9QQ/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwadQp2FCPaKFlL7QI2U4CFbZJqNleM7bCjfV75LDsYLV2UXHhV7gNjpVJLrudOOsifIg/exec";
 
 function fileToBase64(file) {
   return new Promise(function(resolve) {
@@ -300,17 +300,26 @@ export default function App() {
       fileToBase64(form.swingVideo),
       fileToBase64(form.introVideo),
     ]).then(function(results) {
-      var payload = {
-        activity: days.join(" & "),
-        kidNameEN: form.kidNameEN, kidNameTH: form.kidNameTH,
-        kidAge: form.kidAge, kidGender: form.kidGender,
-        kidGolfExp: form.kidGolfExp, kidAcadYear: form.kidAcadYear,
-        kidSchool: form.kidSchool, kidProvince: form.kidProvince,
-        kidCert: form.kidCert,
-        parentName: form.parentName, parentPhone: form.parentPhone, parentEmail: form.parentEmail,
-        kidPhoto: results[0], scorecard: results[1], swingVideo: results[2], introVideo: results[3],
-      };
-      return fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+      var params = new URLSearchParams({
+        activity:    days.join(" & "),
+        kidNameEN:   form.kidNameEN,
+        kidNameTH:   form.kidNameTH,
+        kidAge:      form.kidAge,
+        kidGender:   form.kidGender,
+        kidGolfExp:  form.kidGolfExp,
+        kidAcadYear: form.kidAcadYear,
+        kidSchool:   form.kidSchool,
+        kidProvince: form.kidProvince,
+        kidCert:     form.kidCert,
+        parentName:  form.parentName,
+        parentPhone: form.parentPhone,
+        parentEmail: form.parentEmail,
+        kidPhoto:    results[0] || "",
+        scorecard:   results[1] || "",
+        swingVideo:  results[2] || "",
+        introVideo:  results[3] || "",
+      });
+      return fetch(SCRIPT_URL + "?" + params.toString(), { method: "GET", mode: "no-cors" });
     }).then(function() {
       setSubmitting(false);
       goTo(4);
